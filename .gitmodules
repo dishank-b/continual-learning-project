@@ -1,0 +1,3 @@
+[submodule "src/deep_Mahalanobis_detector"]
+	path = src/deep_Mahalanobis_detector
+	url = https://github.com/pokaxpoka/deep_Mahalanobis_detector.git
