@@ -11,8 +11,8 @@ from sklearn.linear_model import LogisticRegressionCV
 class MahalanobisCompute:
     def __init__(self, args, base_model):
         self.args = args
-        self.model = base_model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = base_model.to(self.device)
         self.feature_list = None
         self.out_dist_list = None
         self.num_output = None
@@ -133,7 +133,7 @@ class MahalanobisCompute:
                 total_X, total_Y = lib_regression.load_characteristics(
                     score, self.args.dataset, out, self.args.outf
                 )
-                lr, results, X_test, Y_test = self.fit_regression(total_X, total_Y)
+                lr, results, X_test, Y_test = self.fit_regression(total_X, total_Y, out)
                 if best_tnr < results["TMP"]["TNR"]:
                     best_tnr = results["TMP"]["TNR"]
                     best_index = score
@@ -152,7 +152,6 @@ class MahalanobisCompute:
             print(" {val:6.2f}\n".format(val=100.0 * results["TMP"]["AUOUT"]), end="")
             print("Input noise: " + list_best_results_out[count_out])
             print("")
-
 
     def fit_regression(self, x, y, out):
         X_val, Y_val, X_test, Y_test = lib_regression.block_split(x, y, out)
