@@ -6,20 +6,35 @@ import torch.nn as nn
 import numpy as np
 
 
+class CustomLoader:
+    def __init__(self, dataset, batch_size, shuffle=False):
+        self.data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+    def __len__(self):
+        return len(self.data_loader)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        x, y, t = next(self.data_loader)
+        return x, y
+
+
 class ContinualTrainer:
     def __init__(
         self,
         scenario,
-        test_loader,
+        test_dataset,
         model,
         start_lr,
         batch_size,
         mahalanobis,
         in_transform,
-        epochs
+        epochs,
     ) -> None:
         self.scenario = scenario
-        self.test_loader = test_loader
+        self.test_loader = CustomLoader(test_dataset, batch_size, False)
         self.model = model
         self.mahalanobis = mahalanobis
         self.start_lr = start_lr
@@ -29,7 +44,7 @@ class ContinualTrainer:
         self.network_regularizer = 0.1
         self.regularizer_loss = nn.MSELoss()
         self.in_transform = in_transform
-        decay=0.1
+        decay = 0.1
         self.lr_lambda = (
             lambda epoch: decay
             if epoch > 0 and (epochs / epoch == 2 or epoch / epochs == 0.75)
@@ -52,10 +67,10 @@ class ContinualTrainer:
             # logging
             print("Starting training of task {}".format(task_id))
             train_taskset, val_taskset = split_train_val(train_taskset, val_split=0.1)
-            train_loader = DataLoader(
+            train_loader = CustomLoader(
                 train_taskset, batch_size=self.batch_size, shuffle=True
             )
-            val_loader = DataLoader(
+            val_loader = CustomLoader(
                 val_taskset, batch_size=self.batch_size, shuffle=True
             )
             n_classes = len(train_taskset.get_classes())
