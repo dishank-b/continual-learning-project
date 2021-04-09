@@ -25,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--outf", default="./output/", help="folder to output results")
     parser.add_argument("--num_classes", type=int, default=10, help="the # of classes")
     parser.add_argument("--net_type", required=True, help="resnet | densenet")
+    # TODO add a flag to cross-validate or to simply do the training and another flag for CL
     args = parser.parse_args()
     print(args)
     mahlanobis_code_path = "src/deep_Mahalanobis_detector"
@@ -84,7 +85,7 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
     )
     # training
-    # trainer.fit(network)
+    trainer.fit(network)
 
     # creating Mahalanobis compute object
     dist_compute = MahalanobisCompute(args, network.get_base_model())
@@ -92,8 +93,8 @@ if __name__ == "__main__":
     # computing mean and precision
     dist_compute.compute_data_stats(train_loader)
     # computing and saving mahalanobis scores
-    dist_compute.compute_mahalanobis(test_loader, in_transform)
+    dist_compute.compute_all_noise_mahalanobis(test_loader, in_transform)
     # now training a logistic regression to detect OOD samples based on its mahalanobis score with reporting its performance
-    dist_compute.all_noise_fit_regression()
+    dist_compute.cross_validate()
 
 

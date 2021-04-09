@@ -43,89 +43,89 @@ class MahalanobisCompute:
             self.model, self.args.num_classes, self.feature_list, train_loader
         )
 
-    def compute_mahalanobis(self, test_loader, in_transform):
+    def compute_all_noise_mahalanobis(
+        self,
+        data_loader,
+        in_transform,
+        m_list=[0.0, 0.01, 0.005, 0.002, 0.0014, 0.001, 0.0005],
+    ):
         assert self.sample_mean is not None
         print("get Mahalanobis scores")
-        m_list = [0.0, 0.01, 0.005, 0.002, 0.0014, 0.001, 0.0005]
         for magnitude in m_list:
             print("Noise: " + str(magnitude))
+            self.compute_mahalanobis(data_loader, in_transform, magnitude)
+
+    def compute_mahalanobis(self, data_loader, in_transform, magnitude):
+        for i in range(self.num_output):
+            M_in = lib_generation.get_Mahalanobis_score(
+                self.model,
+                data_loader,
+                self.args.num_classes,
+                self.args.outf,
+                True,
+                self.args.net_type,
+                self.sample_mean,
+                self.precision,
+                i,
+                magnitude,
+            )
+            M_in = np.asarray(M_in, dtype=np.float32)
+            if i == 0:
+                Mahalanobis_in = M_in.reshape((M_in.shape[0], -1))
+            else:
+                Mahalanobis_in = np.concatenate(
+                    (Mahalanobis_in, M_in.reshape((M_in.shape[0], -1))), axis=1
+                )
+
+        for out_dist in self.out_dist_list:
+            out_test_loader = data_loader.getNonTargetDataSet(
+                out_dist, self.args.batch_size, in_transform, self.args.dataroot
+            )
+            print("Out-distribution: " + out_dist)
             for i in range(self.num_output):
-                M_in = lib_generation.get_Mahalanobis_score(
+                M_out = lib_generation.get_Mahalanobis_score(
                     self.model,
-                    test_loader,
+                    out_test_loader,
                     self.args.num_classes,
                     self.args.outf,
-                    True,
+                    False,
                     self.args.net_type,
                     self.sample_mean,
                     self.precision,
                     i,
                     magnitude,
                 )
-                M_in = np.asarray(M_in, dtype=np.float32)
+                M_out = np.asarray(M_out, dtype=np.float32)
                 if i == 0:
-                    Mahalanobis_in = M_in.reshape((M_in.shape[0], -1))
+                    Mahalanobis_out = M_out.reshape((M_out.shape[0], -1))
                 else:
-                    Mahalanobis_in = np.concatenate(
-                        (Mahalanobis_in, M_in.reshape((M_in.shape[0], -1))), axis=1
+                    Mahalanobis_out = np.concatenate(
+                        (Mahalanobis_out, M_out.reshape((M_out.shape[0], -1))), axis=1,
                     )
 
-            for out_dist in self.out_dist_list:
-                out_test_loader = data_loader.getNonTargetDataSet(
-                    out_dist, self.args.batch_size, in_transform, self.args.dataroot
-                )
-                print("Out-distribution: " + out_dist)
-                for i in range(self.num_output):
-                    M_out = lib_generation.get_Mahalanobis_score(
-                        self.model,
-                        out_test_loader,
-                        self.args.num_classes,
-                        self.args.outf,
-                        False,
-                        self.args.net_type,
-                        self.sample_mean,
-                        self.precision,
-                        i,
-                        magnitude,
-                    )
-                    M_out = np.asarray(M_out, dtype=np.float32)
-                    if i == 0:
-                        Mahalanobis_out = M_out.reshape((M_out.shape[0], -1))
-                    else:
-                        Mahalanobis_out = np.concatenate(
-                            (Mahalanobis_out, M_out.reshape((M_out.shape[0], -1))),
-                            axis=1,
-                        )
+            Mahalanobis_in = np.asarray(Mahalanobis_in, dtype=np.float32)
+            Mahalanobis_out = np.asarray(Mahalanobis_out, dtype=np.float32)
+            (
+                Mahalanobis_data,
+                Mahalanobis_labels,
+            ) = lib_generation.merge_and_generate_labels(
+                Mahalanobis_out, Mahalanobis_in
+            )
+            file_name = os.path.join(
+                self.args.outf,
+                "Mahalanobis_%s_%s_%s.npy"
+                % (str(magnitude), self.args.dataset, out_dist),
+            )
+            Mahalanobis_data = np.concatenate(
+                (Mahalanobis_data, Mahalanobis_labels), axis=1
+            )
+            np.save(file_name, Mahalanobis_data)
+            return Mahalanobis_data[:, 0], Mahalanobis_data[:, 1]
 
-                Mahalanobis_in = np.asarray(Mahalanobis_in, dtype=np.float32)
-                Mahalanobis_out = np.asarray(Mahalanobis_out, dtype=np.float32)
-                (
-                    Mahalanobis_data,
-                    Mahalanobis_labels,
-                ) = lib_generation.merge_and_generate_labels(
-                    Mahalanobis_out, Mahalanobis_in
-                )
-                file_name = os.path.join(
-                    self.args.outf,
-                    "Mahalanobis_%s_%s_%s.npy"
-                    % (str(magnitude), self.args.dataset, out_dist),
-                )
-                Mahalanobis_data = np.concatenate(
-                    (Mahalanobis_data, Mahalanobis_labels), axis=1
-                )
-                np.save(file_name, Mahalanobis_data)
-
-    def all_noise_fit_regression(self):
+    def cross_validate(self, m_list=[0.0, 0.01, 0.005, 0.002, 0.0014, 0.001, 0.0005]):
         list_best_results_out, list_best_results_index_out = [], []
-        score_list = [
-            "Mahalanobis_0.0",
-            "Mahalanobis_0.01",
-            "Mahalanobis_0.005",
-            "Mahalanobis_0.002",
-            "Mahalanobis_0.0014",
-            "Mahalanobis_0.001",
-            "Mahalanobis_0.0005",
-        ]
+        score_list = ["Mahalanobis_{}".format(str(margin)) for margin in m_list]
+
         for out in self.out_dist_list:
             print("Out-of-distribution: ", out)
             best_tnr, best_result, best_index = 0, 0, 0
@@ -133,7 +133,11 @@ class MahalanobisCompute:
                 total_X, total_Y = lib_regression.load_characteristics(
                     score, self.args.dataset, out, self.args.outf
                 )
-                lr, results, X_test, Y_test = self.fit_regression(total_X, total_Y, out)
+
+                X_train, Y_train, X_test, Y_test = lib_regression.block_split(
+                    total_X, total_Y, out
+                )
+                lr, results, X_test, Y_test = self.fit_regression(X_train, Y_train)
                 if best_tnr < results["TMP"]["TNR"]:
                     best_tnr = results["TMP"]["TNR"]
                     best_index = score
@@ -153,15 +157,14 @@ class MahalanobisCompute:
             print("Input noise: " + list_best_results_out[count_out])
             print("")
 
-    def fit_regression(self, x, y, out):
-        X_val, Y_val, X_test, Y_test = lib_regression.block_split(x, y, out)
-        X_train = np.concatenate((X_val[:500], X_val[1000:1500]))
-        Y_train = np.concatenate((Y_val[:500], Y_val[1000:1500]))
-        X_val_for_test = np.concatenate((X_val[500:1000], X_val[1500:]))
-        Y_val_for_test = np.concatenate((Y_val[500:1000], Y_val[1500:]))
+    def fit_regression(self, x_train, y_train):
+        X_train = np.concatenate((x_train[:500], x_train[1000:1500]))
+        Y_train = np.concatenate((y_train[:500], y_train[1000:1500]))
+        X_val_for_test = np.concatenate((x_train[500:1000], x_train[1500:]))
+        Y_val_for_test = np.concatenate((y_train[500:1000], y_train[1500:]))
         lr = LogisticRegressionCV(n_jobs=-1).fit(X_train, Y_train)
         results = lib_regression.detection_performance(
             lr, X_val_for_test, Y_val_for_test, self.args.outf
         )
-        return lr, results, X_test, Y_test
+        return lr, results
 
