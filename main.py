@@ -138,6 +138,7 @@ if __name__ == "__main__":
             dist_compute,
             in_transform,
         )
+        trainer.fit()
 
     else:
         raise NotImplementedError(
