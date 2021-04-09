@@ -6,18 +6,18 @@ import torch.nn as nn
 import numpy as np
 
 
-class CustomLoader:
-    def __init__(self, dataset, batch_size, shuffle=False):
-        self.data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+class CustomDataset:
+    def __init__(self, dataset) -> None:
+        self.dataset = dataset
 
     def __len__(self):
-        return len(self.data_loader)
+        return len(self.dataset)
 
     def __iter__(self):
         return self
 
-    def __next__(self):
-        x, y, t = next(self.data_loader)
+    def __getitem__(self, inx):
+        x, y, t = self.dataset[inx]
         return x, y
 
 
@@ -34,7 +34,7 @@ class ContinualTrainer:
         epochs,
     ) -> None:
         self.scenario = scenario
-        self.test_loader = CustomLoader(test_dataset, batch_size, False)
+        self.test_loader = DataLoader(CustomDataset(test_dataset), batch_size, False)
         self.model = model
         self.mahalanobis = mahalanobis
         self.start_lr = start_lr
@@ -67,15 +67,15 @@ class ContinualTrainer:
             # logging
             print("Starting training of task {}".format(task_id))
             train_taskset, val_taskset = split_train_val(train_taskset, val_split=0.1)
-            train_loader = CustomLoader(
-                train_taskset, batch_size=self.batch_size, shuffle=True
+            train_loader = DataLoader(
+                CustomDataset(train_taskset), batch_size=self.batch_size, shuffle=True
             )
-            val_loader = CustomLoader(
-                val_taskset, batch_size=self.batch_size, shuffle=True
+            val_loader = DataLoader(
+                CustomDataset(val_taskset), batch_size=self.batch_size, shuffle=True
             )
             n_classes = len(train_taskset.get_classes())
             for _ in range(self.epochs):
-                for x, y, t in train_loader:
+                for x, y in train_loader:
                     optimizer.zero_grad()
                     x = x.to(self.device)
                     y = y.to(self.device)
