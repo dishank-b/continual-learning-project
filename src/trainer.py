@@ -103,15 +103,7 @@ class CustomModel(pl.LightningModule):
         optimizer = torch.optim.SGD(
             self.model.parameters(), lr=self.start_lr, momentum=0.9
         )
-        scheduler = torch.optim.lr_scheduler.Lambd        trainer, network = create_trainer_model(
-            args.net_type,
-            train_loader,
-            test_loader,
-            args.num_classes,
-            args.epochs,
-            network_f_name,
-            batch_size=args.batch_size,
-        )aLR(optimizer, self.lr_lambda)
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, self.lr_lambda)
         return [optimizer], [scheduler]
 
     def test_step(self, batch, batch_idx):
