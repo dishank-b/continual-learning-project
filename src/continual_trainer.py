@@ -16,6 +16,7 @@ class ContinualTrainer:
         batch_size,
         mahalanobis,
         in_transform,
+        epochs
     ) -> None:
         self.scenario = scenario
         self.test_loader = test_loader
@@ -28,6 +29,14 @@ class ContinualTrainer:
         self.network_regularizer = 0.1
         self.regularizer_loss = nn.MSELoss()
         self.in_transform = in_transform
+        decay=0.1
+        self.lr_lambda = (
+            lambda epoch: decay
+            if epoch > 0 and (epochs / epoch == 2 or epoch / epochs == 0.75)
+            else 1
+        )
+        self.epochs = epochs
+        self.device = self.mahalanobis.device
 
     def configure_optimizers(self, model):
         optimizer = torch.optim.SGD(model.parameters(), lr=self.start_lr, momentum=0.9)
@@ -50,20 +59,23 @@ class ContinualTrainer:
                 val_taskset, batch_size=self.batch_size, shuffle=True
             )
             n_classes = len(train_taskset.get_classes())
-            for x, y, t in train_loader:
-                optimizer.zero_grad()
-                y_hat = model(x)
-                loss = self.loss_fn(y_hat, y)
-                if prev_model is not None:
-                    # TODO switch between fine tune and regularization based on OOD score
-                    current_logit = model.penultimate_forward(x)
-                    prev_logit = prev_model.penultimate_forward(x)
-                    loss += self.network_regularizer * self.regularizer_loss(
-                        current_logit, prev_logit
-                    )
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
+            for _ in range(self.epochs):
+                for x, y, t in train_loader:
+                    optimizer.zero_grad()
+                    x = x.to(self.device)
+                    y = y.to(self.device)
+                    y_hat = model(x)
+                    loss = self.loss_fn(y_hat, y)
+                    if prev_model is not None:
+                        # TODO switch between fine tune and regularization based on OOD score
+                        current_logit = model.penultimate_forward(x)
+                        prev_logit = prev_model.penultimate_forward(x)
+                        loss += self.network_regularizer * self.regularizer_loss(
+                            current_logit, prev_logit
+                        )
+                    loss.backward()
+                    optimizer.step()
+                    scheduler.step()
             # save current task network
             prev_model = deepcopy(model)
             self.mahalanobis.update_network(model)
@@ -86,7 +98,7 @@ class ContinualTrainer:
                 val_loader, self.in_transform, m_list=[0.001]
             )
             self.mahalanobis.cross_validate(m_list=[0.001])
-        # TODO compute test set performance final 
+        # TODO compute test set performance final
 
         # compute final OOD performance
         self.mahalanobis.sample_mean = total_mean

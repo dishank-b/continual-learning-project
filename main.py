@@ -137,6 +137,7 @@ if __name__ == "__main__":
             args.batch_size,
             dist_compute,
             in_transform,
+            args.epochs
         )
         trainer.fit()
 
