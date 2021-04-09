@@ -35,13 +35,20 @@ class MahalanobisCompute:
         for out in temp_list:
             self.feature_list[count] = out.size(1)
             count += 1
+    
+    def update_network(self, model):
+        self.model = model.to(self.device)
+        self._init_information()
 
-    def compute_data_stats(self, train_loader):
+    def compute_data_stats(self, train_loader, num_classes):
         print("get sample mean and covariance")
-        # TODO make it update continually for new upcoming tasks
-        self.sample_mean, self.precision = lib_generation.sample_estimator(
-            self.model, self.args.num_classes, self.feature_list, train_loader
+        self.sample_mean, self.precision = self.sample_estimator(train_loader, num_classes)
+
+    def sample_estimator(self, train_loader, num_classes):
+        sample_mean, precision = lib_generation.sample_estimator(
+            self.model, num_classes, self.feature_list, train_loader
         )
+        return sample_mean, precision
 
     def compute_all_noise_mahalanobis(
         self,
@@ -53,9 +60,9 @@ class MahalanobisCompute:
         print("get Mahalanobis scores")
         for magnitude in m_list:
             print("Noise: " + str(magnitude))
-            self.compute_mahalanobis(data_loader, in_transform, magnitude)
+            self.compute_mahalanobis(data_loader, in_transform, magnitude, True)
 
-    def compute_mahalanobis(self, data_loader, in_transform, magnitude):
+    def compute_mahalanobis(self, data_loader, in_transform, magnitude, save=False):
         for i in range(self.num_output):
             M_in = lib_generation.get_Mahalanobis_score(
                 self.model,
@@ -119,7 +126,8 @@ class MahalanobisCompute:
             Mahalanobis_data = np.concatenate(
                 (Mahalanobis_data, Mahalanobis_labels), axis=1
             )
-            np.save(file_name, Mahalanobis_data)
+            if save:
+                np.save(file_name, Mahalanobis_data)
             return Mahalanobis_data[:, 0], Mahalanobis_data[:, 1]
 
     def cross_validate(self, m_list=[0.0, 0.01, 0.005, 0.002, 0.0014, 0.001, 0.0005]):

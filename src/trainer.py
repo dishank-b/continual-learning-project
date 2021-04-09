@@ -5,6 +5,15 @@ import models
 from sklearn.metrics import accuracy_score
 
 
+def create_model(net_type, n_classes):
+    if net_type == "densenet":
+        model = models.DenseNet3(100, n_classes)
+    elif net_type == "resnet":
+        model = models.ResNet34(n_classes)
+    else:
+        raise Exception("Network type {} doesnt exist !!".format(net_type))
+    return model
+
 def create_trainer_model(
     net_type,
     train_loader,
@@ -40,7 +49,6 @@ def create_trainer_model(
         batch_size,
         start_lr,
     )
-    # trainer.fit(model)
     return trainer, model
 
 
@@ -57,13 +65,7 @@ class CustomModel(pl.LightningModule):
         start_lr=0.1,
     ):
         super().__init__()
-        if net_type == "densenet":
-            self.model = models.DenseNet3(100, n_classes)
-        elif net_type == "resnet":
-            self.model = models.ResNet34(n_classes)
-        else:
-            raise Exception("Network type {} doesnt exist !!".format(net_type))
-
+        self.model = create_model(net_type, n_classes)
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.loss_fn = nn.CrossEntropyLoss()
@@ -74,6 +76,7 @@ class CustomModel(pl.LightningModule):
             if epoch > 0 and (epochs / epoch == 2 or epoch / epochs == 0.75)
             else 1
         )
+
     def get_base_model(self):
         return self.model
 
@@ -100,15 +103,21 @@ class CustomModel(pl.LightningModule):
         optimizer = torch.optim.SGD(
             self.model.parameters(), lr=self.start_lr, momentum=0.9
         )
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, self.lr_lambda)
+        scheduler = torch.optim.lr_scheduler.Lambd        trainer, network = create_trainer_model(
+            args.net_type,
+            train_loader,
+            test_loader,
+            args.num_classes,
+            args.epochs,
+            network_f_name,
+            batch_size=args.batch_size,
+        )aLR(optimizer, self.lr_lambda)
         return [optimizer], [scheduler]
 
     def test_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
-
         loss = self.loss_fn(logits, y)
-
         # validation metrics
         preds = torch.argmax(logits, dim=1)
         acc = accuracy_score(y, preds)
