@@ -110,7 +110,7 @@ class ContinualTrainer:
             self.mahalanobis.precision = precision
             # check OOD performance
             self.mahalanobis.compute_all_noise_mahalanobis(
-                val_loader, self.in_transform, m_list=[0.001]
+                val_loader, self.in_transform, n_classes, m_list=[0.001]
             )
             self.mahalanobis.cross_validate(m_list=[0.001])
         # TODO compute test set performance final
@@ -119,6 +119,9 @@ class ContinualTrainer:
         self.mahalanobis.sample_mean = total_mean
         self.mahalanobis.precision = total_precision
         self.mahalanobis.compute_all_noise_mahalanobis(
-            self.test_loader, self.in_transform, m_list=[0.001]
+            self.test_loader,
+            self.in_transform,
+            self.mahalanobis.args.num_classes,
+            m_list=[0.001],
         )
         self.mahalanobis.cross_validate(m_list=[0.001])

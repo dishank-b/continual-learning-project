@@ -54,20 +54,21 @@ class MahalanobisCompute:
         self,
         data_loader,
         in_transform,
+        num_classes,
         m_list=[0.0, 0.01, 0.005, 0.002, 0.0014, 0.001, 0.0005],
     ):
         assert self.sample_mean is not None
         print("get Mahalanobis scores")
         for magnitude in m_list:
             print("Noise: " + str(magnitude))
-            self.compute_mahalanobis(data_loader, in_transform, magnitude, True)
+            self.compute_mahalanobis(data_loader, in_transform, magnitude,num_classes, True)
 
-    def compute_mahalanobis(self, data_loader, in_transform, magnitude, save=False):
+    def compute_mahalanobis(self, data_loader, in_transform, magnitude, num_classes, save=False):
         for i in range(self.num_output):
             M_in = lib_generation.get_Mahalanobis_score(
                 self.model,
                 data_loader,
-                self.args.num_classes,
+                num_classes,
                 self.args.outf,
                 True,
                 self.args.net_type,
@@ -93,7 +94,7 @@ class MahalanobisCompute:
                 M_out = lib_generation.get_Mahalanobis_score(
                     self.model,
                     out_test_loader,
-                    self.args.num_classes,
+                    num_classes,
                     self.args.outf,
                     False,
                     self.args.net_type,

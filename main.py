@@ -99,7 +99,7 @@ if __name__ == "__main__":
         # computing mean and precision
         dist_compute.compute_data_stats(train_loader, args.num_classes)
         # computing and saving mahalanobis scores
-        dist_compute.compute_all_noise_mahalanobis(test_loader, in_transform)
+        dist_compute.compute_all_noise_mahalanobis(test_loader, in_transform, args.num_classes)
         # now training a logistic regression to detect OOD samples based on its mahalanobis score with reporting its performance
         dist_compute.cross_validate()
 
