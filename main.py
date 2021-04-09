@@ -133,7 +133,7 @@ if __name__ == "__main__":
             scenario,
             test_loader,
             model,
-            0.1,
+            3e-4,
             args.batch_size,
             dist_compute,
             in_transform,

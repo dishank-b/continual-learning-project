@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 import numpy as np
 import lib_generation
-import data_loader
+import data_loader as DataLoader
 import os
 import lib_regression
 from sklearn.linear_model import LogisticRegressionCV
@@ -61,9 +61,9 @@ class MahalanobisCompute:
         print("get Mahalanobis scores")
         for magnitude in m_list:
             print("Noise: " + str(magnitude))
-            self.compute_mahalanobis(data_loader, in_transform, magnitude,num_classes, True)
+            self.compute_mahalanobis(data_loader, in_transform, magnitude,num_classes)
 
-    def compute_mahalanobis(self, data_loader, in_transform, magnitude, num_classes, save=False):
+    def compute_mahalanobis(self, data_loader, in_transform, magnitude, num_classes):
         for i in range(self.num_output):
             M_in = lib_generation.get_Mahalanobis_score(
                 self.model,
@@ -86,7 +86,7 @@ class MahalanobisCompute:
                 )
 
         for out_dist in self.out_dist_list:
-            out_test_loader = data_loader.getNonTargetDataSet(
+            out_test_loader = DataLoader.getNonTargetDataSet(
                 out_dist, self.args.batch_size, in_transform, self.args.dataroot
             )
             print("Out-distribution: " + out_dist)
@@ -127,9 +127,7 @@ class MahalanobisCompute:
             Mahalanobis_data = np.concatenate(
                 (Mahalanobis_data, Mahalanobis_labels), axis=1
             )
-            if save:
-                np.save(file_name, Mahalanobis_data)
-            return Mahalanobis_data[:, 0], Mahalanobis_data[:, 1]
+            np.save(file_name, Mahalanobis_data)
 
     def cross_validate(self, m_list=[0.0, 0.01, 0.005, 0.002, 0.0014, 0.001, 0.0005]):
         list_best_results_out, list_best_results_index_out = [], []
@@ -146,7 +144,7 @@ class MahalanobisCompute:
                 X_train, Y_train, X_test, Y_test = lib_regression.block_split(
                     total_X, total_Y, out
                 )
-                lr, results, X_test, Y_test = self.fit_regression(X_train, Y_train)
+                lr, results = self.fit_regression(X_train, Y_train)
                 if best_tnr < results["TMP"]["TNR"]:
                     best_tnr = results["TMP"]["TNR"]
                     best_index = score
