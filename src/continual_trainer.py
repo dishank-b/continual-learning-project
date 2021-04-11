@@ -63,6 +63,7 @@ class ContinualTrainer:
         model = deepcopy(self.model)
         optimizer, scheduler = self.configure_optimizers(model)
         total_mean, total_precision = None, None
+        n_classes = 0
         for task_id, train_taskset in enumerate(self.scenario):
             # logging
             print("Starting training of task {}".format(task_id))
@@ -73,7 +74,7 @@ class ContinualTrainer:
             val_loader = DataLoader(
                 CustomDataset(val_taskset), batch_size=self.batch_size, shuffle=True
             )
-            n_classes = len(train_taskset.get_classes())
+            n_classes += len(train_taskset.get_classes())
             for _ in range(self.epochs):
                 for x, y in train_loader:
                     optimizer.zero_grad()
@@ -83,8 +84,8 @@ class ContinualTrainer:
                     loss = self.loss_fn(y_hat, y)
                     if prev_model is not None:
                         # TODO switch between fine tune and regularization based on OOD score
-                        current_logit = model.penultimate_forward(x)
-                        prev_logit = prev_model.penultimate_forward(x)
+                        current_logit = model.penultimate_forward(x)[-1]
+                        prev_logit = prev_model.penultimate_forward(x)[-1]
                         loss += self.network_regularizer * self.regularizer_loss(
                             current_logit, prev_logit
                         )
