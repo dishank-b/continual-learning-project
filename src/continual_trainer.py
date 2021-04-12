@@ -89,7 +89,7 @@ class ContinualTrainer:
                     if prev_model is not None:
                         # TODO switch between fine tune and regularization based on OOD score
                         current_logit = model.penultimate_forward(x)[-1]
-                        prev_logit = prev_model.penultimate_forward(x)[-1]
+                        prev_logit = prev_model.penultimate_forward(x)[-1].detach()
                         loss += self.network_regularizer * self.regularizer_loss(
                             current_logit, prev_logit
                         )
