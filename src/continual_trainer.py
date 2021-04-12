@@ -130,10 +130,10 @@ class ContinualTrainer:
                 total_mean = sample_mean
                 total_precision = precision
             else:
-                # FIXME list of tensors error can't multiply sequence by non-int of type 'float'
-                total_precision = (n_classes / (n_classes + 1)) * total_precision + (
-                    1 / (n_classes + 1)
-                ) * precision
+                for i in range(len(precision)):
+                    total_precision[i] = (n_classes / (n_classes + 1)) * total_precision[i] + (
+                        1 / (n_classes + 1)
+                    ) * precision[i]
                 total_mean = total_mean + sample_mean
             self.mahalanobis.sample_mean = sample_mean
             self.mahalanobis.precision = precision
