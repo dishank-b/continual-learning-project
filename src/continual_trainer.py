@@ -7,8 +7,10 @@ import numpy as np
 
 
 class CustomDataset:
-    def __init__(self, dataset) -> None:
+    def __init__(self, dataset, normalize_classes=False, n_prev_classes=0) -> None:
         self.dataset = dataset
+        self.normalize_classes = normalize_classes
+        self.n_prev_classes = n_prev_classes
 
     def __len__(self):
         return len(self.dataset)
@@ -18,6 +20,8 @@ class CustomDataset:
 
     def __getitem__(self, inx):
         x, y, t = self.dataset[inx]
+        if self.normalize_classes:
+            y = y - self.n_prev_classes
         return x, y
 
 
@@ -63,7 +67,7 @@ class ContinualTrainer:
         model = deepcopy(self.model)
         optimizer, scheduler = self.configure_optimizers(model)
         total_mean, total_precision = None, None
-        n_classes = 0
+        n_prev_classes = 0
         for task_id, train_taskset in enumerate(self.scenario):
             # logging
             print("Starting training of task {}".format(task_id))
@@ -74,7 +78,7 @@ class ContinualTrainer:
             val_loader = DataLoader(
                 CustomDataset(val_taskset), batch_size=self.batch_size, shuffle=True
             )
-            n_classes += len(train_taskset.get_classes())
+            n_classes = len(train_taskset.get_classes())
             for _ in range(self.epochs):
                 for x, y in train_loader:
                     optimizer.zero_grad()
@@ -96,13 +100,37 @@ class ContinualTrainer:
             prev_model = deepcopy(model)
             self.mahalanobis.update_network(model)
             # computing mean and precision
+            if n_prev_classes == 0:
+                train_loader_partial = train_loader
+                val_loader_partial = val_loader
+            else:
+                train_loader_partial = DataLoader(
+                    CustomDataset(
+                        train_taskset,
+                        normalize_classes=True,
+                        n_prev_classes=n_prev_classes,
+                    ),
+                    batch_size=self.batch_size,
+                    shuffle=True,
+                )
+                val_loader_partial = DataLoader(
+                    CustomDataset(
+                        val_taskset,
+                        normalize_classes=True,
+                        n_prev_classes=n_prev_classes,
+                    ),
+                    batch_size=self.batch_size,
+                    shuffle=True,
+                )
+            n_prev_classes = n_classes
             sample_mean, precision = self.mahalanobis.sample_estimator(
-                train_loader, n_classes
+                train_loader_partial, n_classes
             )
             if total_mean is None:
                 total_mean = sample_mean
                 total_precision = precision
             else:
+                # FIXME list of tensors error can't multiply sequence by non-int of type 'float'
                 total_precision = (n_classes / (n_classes + 1)) * total_precision + (
                     1 / (n_classes + 1)
                 ) * precision
@@ -111,7 +139,7 @@ class ContinualTrainer:
             self.mahalanobis.precision = precision
             # check OOD performance
             self.mahalanobis.compute_all_noise_mahalanobis(
-                val_loader, self.in_transform, n_classes, m_list=[0.001]
+                val_loader_partial, self.in_transform, n_classes, m_list=[0.001]
             )
             self.mahalanobis.cross_validate(m_list=[0.001])
         # TODO compute test set performance final
