@@ -5,7 +5,9 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import numpy as np
 
-
+# TODO use Sequoia
+# FIXME continual trainer not found file bug due to not saving flag maybe ??
+# FIXME Index out of bound in sample mean and variance estimation giving label 3
 class CustomDataset:
     def __init__(self, dataset, normalize_classes=False, n_prev_classes=0) -> None:
         self.dataset = dataset
@@ -95,7 +97,7 @@ class ContinualTrainer:
                         )
                     loss.backward()
                     optimizer.step()
-                    scheduler.step()
+                    scheduler.step() 
             # save current task network
             prev_model = deepcopy(model)
             self.mahalanobis.update_network(model)
@@ -122,7 +124,7 @@ class ContinualTrainer:
                     batch_size=self.batch_size,
                     shuffle=True,
                 )
-            n_prev_classes = n_classes
+            n_prev_classes += n_classes
             sample_mean, precision = self.mahalanobis.sample_estimator(
                 train_loader_partial, n_classes
             )

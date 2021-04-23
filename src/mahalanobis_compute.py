@@ -6,6 +6,7 @@ import data_loader as DataLoader
 import os
 import lib_regression
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import train_test_split
 
 
 class MahalanobisCompute:
@@ -35,14 +36,16 @@ class MahalanobisCompute:
         for out in temp_list:
             self.feature_list[count] = out.size(1)
             count += 1
-    
+
     def update_network(self, model):
         self.model = model.to(self.device)
         self._init_information()
 
     def compute_data_stats(self, train_loader, num_classes):
         print("get sample mean and covariance")
-        self.sample_mean, self.precision = self.sample_estimator(train_loader, num_classes)
+        self.sample_mean, self.precision = self.sample_estimator(
+            train_loader, num_classes
+        )
 
     def sample_estimator(self, train_loader, num_classes):
         sample_mean, precision = lib_generation.sample_estimator(
@@ -61,7 +64,7 @@ class MahalanobisCompute:
         print("get Mahalanobis scores")
         for magnitude in m_list:
             print("Noise: " + str(magnitude))
-            self.compute_mahalanobis(data_loader, in_transform, magnitude,num_classes)
+            self.compute_mahalanobis(data_loader, in_transform, magnitude, num_classes)
 
     def compute_mahalanobis(self, data_loader, in_transform, magnitude, num_classes):
         for i in range(self.num_output):
@@ -140,9 +143,12 @@ class MahalanobisCompute:
                 total_X, total_Y = lib_regression.load_characteristics(
                     score, self.args.dataset, out, self.args.outf
                 )
-
-                X_train, Y_train, X_test, Y_test = lib_regression.block_split(
-                    total_X, total_Y, out
+                # FIXME add stratified split instead of the paper's code split
+                # X_train, Y_train, X_test, Y_test = lib_regression.block_split(
+                #     total_X, total_Y, out
+                # )
+                X_train, X_test, Y_train, Y_test = train_test_split(
+                    total_X, total_Y, train_size=1000, stratify=total_Y
                 )
                 lr, results = self.fit_regression(X_train, Y_train)
                 if best_tnr < results["TMP"]["TNR"]:
@@ -151,8 +157,9 @@ class MahalanobisCompute:
                     best_result = lib_regression.detection_performance(
                         lr, X_test, Y_test, self.args.outf
                     )
-            list_best_results_out.append(best_result)
-            list_best_results_index_out.append(best_index)
+            if best_result != 0:
+                list_best_results_out.append(best_result)
+                list_best_results_index_out.append(best_index)
         count_out = 0
         for results in list_best_results_out:
             print("out_distribution: " + self.out_dist_list[count_out])
@@ -165,10 +172,10 @@ class MahalanobisCompute:
             print("")
 
     def fit_regression(self, x_train, y_train):
-        X_train = np.concatenate((x_train[:500], x_train[1000:1500]))
-        Y_train = np.concatenate((y_train[:500], y_train[1000:1500]))
-        X_val_for_test = np.concatenate((x_train[500:1000], x_train[1500:]))
-        Y_val_for_test = np.concatenate((y_train[500:1000], y_train[1500:]))
+        # rectified split of train and validation to avoid imbalance
+        X_train, X_val_for_test, Y_train, Y_val_for_test = train_test_split(
+            x_train, y_train, test_size=0.5, stratify=y_train
+        )
         lr = LogisticRegressionCV(n_jobs=-1).fit(X_train, Y_train)
         results = lib_regression.detection_performance(
             lr, X_val_for_test, Y_val_for_test, self.args.outf
