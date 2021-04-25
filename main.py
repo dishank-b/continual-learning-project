@@ -123,15 +123,12 @@ if __name__ == "__main__":
                 "SVHN dataset not supported in Continuum and continual learning scenario"
             )
         # TODO maybe we can change the scenario depending on the results or the dataset or add a flag for increments
-        scenario = ClassIncremental(train_dataset, increment=1, initial_increment=3)
-        test_loader = DataLoader(
-            test_dataset, shuffle=False, batch_size=args.batch_size
-        )
+        scenario = ClassIncremental(train_dataset, increment=1, initial_increment=3) 
         model = create_model(args.net_type, args.num_classes)
         dist_compute = MahalanobisCompute(args, model)
         trainer = ContinualTrainer(
             scenario,
-            test_loader,
+            test_dataset,
             model,
             3e-4,
             args.batch_size,

@@ -148,7 +148,7 @@ class ContinualTrainer:
 
         # compute final OOD performance
         self.mahalanobis.sample_mean = total_mean
-        self.mahalanobis.precision = total_precision
+        self.mahalanobis.precision = total_precision 
         self.mahalanobis.compute_all_noise_mahalanobis(
             self.test_loader,
             self.in_transform,
