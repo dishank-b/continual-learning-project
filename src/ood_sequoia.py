@@ -57,7 +57,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         lwf_regularizer: float = 0
         temperature_lwf: float = 2
         # decay of max_epochs after each task
-        max_epochs_decay_per_task: float = 0.95
+        epochs_decay_per_task: float = 0.95
         noise_ood: float = 0.001
 
     def __init__(
@@ -201,7 +201,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
             self._mahalanobis_update(train_env, valid_env)
 
         self.n_seen_classes += self.n_classes
-        self.hparams.max_epochs_per_task *= self.hparams.max_epochs_decay_per_task
+        self.hparams.epochs *= self.hparams.epochs_decay_per_task
 
     def _mahalanobis_update(
         self, train_env: PassiveEnvironment, valid_env: PassiveEnvironment
