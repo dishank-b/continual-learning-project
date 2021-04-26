@@ -143,10 +143,6 @@ class MahalanobisCompute:
                 total_X, total_Y = lib_regression.load_characteristics(
                     score, self.args.dataset, out, self.args.outf
                 )
-                # FIXME add stratified split instead of the paper's code split
-                # X_train, Y_train, X_test, Y_test = lib_regression.block_split(
-                #     total_X, total_Y, out
-                # )
                 X_train, X_test, Y_train, Y_test = train_test_split(
                     total_X, total_Y, train_size=1000, stratify=total_Y
                 )
@@ -170,6 +166,7 @@ class MahalanobisCompute:
             print(" {val:6.2f}\n".format(val=100.0 * results["TMP"]["AUOUT"]), end="")
             print("Input noise: " + list_best_results_index_out[count_out])
             print("")
+        return list_best_results_out
 
     def fit_regression(self, x_train, y_train):
         # rectified split of train and validation to avoid imbalance

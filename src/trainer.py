@@ -5,14 +5,66 @@ import models
 from sklearn.metrics import accuracy_score
 
 
+class TestModel(nn.Module):
+    def __init__(self, n_classes):
+        super().__init__()
+        encoder_layers = []
+        encoder_layers.append(nn.Sequential(nn.Conv2d(3, 6, 5), nn.ReLU(),))
+        encoder_layers.append(nn.MaxPool2d(2))
+        encoder_layers.append(nn.Sequential(nn.Conv2d(6, 16, 5), nn.ReLU(),))
+        encoder_layers.append(nn.MaxPool2d(2))
+        classifier_layers = []
+        classifier_layers.append(
+            nn.Sequential(nn.Flatten(), nn.Linear(256, 120), nn.ReLU(),)
+        )
+        classifier_layers.append(nn.Sequential(nn.Linear(120, 84), nn.ReLU(),))
+        classifier_layers.append(nn.Linear(84, n_classes),)
+        self.model = nn.ModuleList(encoder_layers + classifier_layers)
+        self.encoder_indx_out = len(encoder_layers)
+
+ 
+
+    def forward(self, x):
+        # NOTE: here we don't make use of the task labels.
+        logits = x
+        for indx, layer in enumerate(self.model):
+            logits = layer(logits)
+        return logits
+
+    def penultimate_forward(self, x):
+        logits = x
+        for indx, layer in enumerate(self.model):
+            logits = layer(logits)
+            if indx == self.encoder_indx_out:
+                features = logits
+        return logits, features
+
+    def intermediate_forward(self, x, layer_index):
+        for i, layer in enumerate(self.model):
+            x = layer(x)
+            if i == layer_index:
+                return x
+
+    def feature_list(self, x):
+        out_list = []
+        for layer in self.model:
+            x = layer(x)
+            out_list.append(x)
+        return x, out_list
+
+
 def create_model(net_type, n_classes):
     if net_type == "densenet":
         model = models.DenseNet3(100, n_classes)
     elif net_type == "resnet":
         model = models.ResNet34(n_classes)
+    elif net_type == "debug":
+        model = TestModel(n_classes)
     else:
         raise Exception("Network type {} doesnt exist !!".format(net_type))
+
     return model
+
 
 def create_trainer_model(
     net_type,

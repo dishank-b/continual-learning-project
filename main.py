@@ -7,8 +7,7 @@ import torch
 import numpy as np
 
 
-if __name__ == "__main__":
-    # TODO add flag for continual learning
+def add_args():
     parser = argparse.ArgumentParser(description="PyTorch code: Mahalanobis detector")
     parser.add_argument(
         "--batch_size",
@@ -33,7 +32,21 @@ if __name__ == "__main__":
         action="store_true",
         help="Class incremental scenario with deep Mahalanobis  ",
     )
-    # TODO add a flag to cross-validate or to simply do the training and another flag for CL
+    parser.add_argument(
+        "--nb_tasks", type=int, default=7, help="number of class incremental tasks"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="debug mode to reduce model size and number of tasks",
+    )
+    # TODO add flag to run baselines e.g. ewc and lwf etc...
+    # TODO add LR as a paramter in the arguments
+    return parser
+
+
+if __name__ == "__main__":
+    parser = add_args()
     args = parser.parse_args()
     print(args)
     mahlanobis_code_path = "src/deep_Mahalanobis_detector"
@@ -44,7 +57,7 @@ if __name__ == "__main__":
         raise Exception("Deep Mahalanobis code not found!")
 
     import data_loader
-    from src import MahalanobisCompute, create_trainer_model, ContinualTrainer
+    from src import MahalanobisCompute, create_trainer_model
 
     network_f_name = args.net_type + "_" + args.dataset + ".pth"
     pre_trained_net = "./pre_trained/" + network_f_name
@@ -76,10 +89,11 @@ if __name__ == "__main__":
     # load dataset
     print("load target data: ", args.dataset)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    train_loader, test_loader = data_loader.getTargetDataSet(
+        args.dataset, args.batch_size, in_transform, args.dataroot
+    )
     if args.reproduce:
-        train_loader, test_loader = data_loader.getTargetDataSet(
-            args.dataset, args.batch_size, in_transform, args.dataroot
-        )
         # get model and trainer to train the network using pytorch lightning
         trainer, network = create_trainer_model(
             args.net_type,
@@ -99,44 +113,58 @@ if __name__ == "__main__":
         # computing mean and precision
         dist_compute.compute_data_stats(train_loader, args.num_classes)
         # computing and saving mahalanobis scores
-        dist_compute.compute_all_noise_mahalanobis(test_loader, in_transform, args.num_classes)
+        dist_compute.compute_all_noise_mahalanobis(
+            test_loader, in_transform, args.num_classes
+        )
         # now training a logistic regression to detect OOD samples based on its mahalanobis score with reporting its performance
         dist_compute.cross_validate()
 
         # TODO add joint training
     elif args.continual:
-        from torch.utils.data import DataLoader
-        from continuum import ClassIncremental
-        from continuum.datasets import CIFAR10, CIFAR100
-        from continuum.tasks import split_train_val
-        from src import create_model
+        from src import create_model, OODSequoia
+        from sequoia.settings.passive.cl import DomainIncrementalSetting
 
-        # class incremental scenario
-        if args.dataset == "cifar10":
-            train_dataset = CIFAR10(args.dataroot, train=True, download=True)
-            test_dataset = CIFAR10(args.dataroot, train=False, download=True)
-        elif args.dataset == "cifar100":
-            train_dataset = CIFAR100(args.dataroot, train=True, download=True)
-            test_dataset = CIFAR100(args.dataroot, train=False, download=True)
-        elif args.dataset == "svhn":
-            raise NotImplementedError(
-                "SVHN dataset not supported in Continuum and continual learning scenario"
-            )
-        # TODO maybe we can change the scenario depending on the results or the dataset or add a flag for increments
-        scenario = ClassIncremental(train_dataset, increment=1, initial_increment=3) 
-        model = create_model(args.net_type, args.num_classes)
-        dist_compute = MahalanobisCompute(args, model)
-        trainer = ContinualTrainer(
-            scenario,
-            test_dataset,
-            model,
-            3e-4,
-            args.batch_size,
-            dist_compute,
-            in_transform,
-            args.epochs
+        from sequoia.common import Config
+
+        if args.debug:
+            model = create_model("debug", args.num_classes)
+            dataset = "fashionmnist"
+            nb_tasks = 5
+            epochs = 3
+            dist_compute = None
+        else:
+            model = create_model(args.net_type, args.num_classes)
+            dataset = args.dataset
+            nb_tasks = args.nb_tasks
+            epochs = args.epochs
+            dist_compute = MahalanobisCompute(args, model)
+        # TODO add lwf and ewc arguments for the bseline
+        hparams = OODSequoia.HParams(
+            start_lr=3e-4,
+            epochs=epochs,
+            batch_size=args.batch_size,
+            ood_regularizer=0.75,
+            lwf_regularizer=0,
+            temperature_lwf=2,
+            wandb_logging=False,
         )
-        trainer.fit()
+        method = OODSequoia(
+            test_loader.dataset, model, dist_compute, in_transform, hparams
+        )
+        setting = DomainIncrementalSetting(
+            dataset=dataset,
+            nb_tasks=nb_tasks,
+            batch_size=args.batch_size,
+        )
+        results = setting.apply(method, config=Config(data_dir="data"))
+        # now add plots coming from results
+        plots_dict = results.make_plots()
+        plots_dict["task_metrics"].savefig(os.path.join(args.outf, "results_plot.jpg"))
+        summary = results.summary()
+        print(summary)
+        with open(os.path.join(args.outf, "results.txt"), "w") as f:
+            f.write(summary)
+        # TODO add WANDB support
 
     else:
         raise NotImplementedError(
