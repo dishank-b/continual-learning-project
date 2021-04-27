@@ -151,7 +151,6 @@ if __name__ == "__main__":
             epochs = args.epochs
             # TODO  add a flag to compute mahalanobis distance
             dist_compute = MahalanobisCompute(args, model)
-        # TODO add lwf and ewc arguments for the bseline
         if args.lwf:
             hparams = OODSequoia.HParams(
                 start_lr=3e-4,
@@ -210,7 +209,7 @@ if __name__ == "__main__":
         summary = results.summary()
         print(summary)
         with open(os.path.join(args.outf, "results.txt"), "w") as f:
-            f.write(summary)
+            f.write(summary) 
 
     else:
         raise NotImplementedError(

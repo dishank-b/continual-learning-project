@@ -1,7 +1,5 @@
 from .ood_sequoia import OODSequoia 
 from sequoia.settings import ClassIncrementalSetting
-
-from typing import Optional
 import torch.nn as nn  
 from dataclasses import dataclass
 from torch import Tensor

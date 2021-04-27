@@ -76,6 +76,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         self.total_mean = None
         self.total_precision = None
         self.ood_results = None
+        self.total_n_tasks  = None
         decay = 0.1
         self.lr_lambda = (
             lambda epoch: decay
@@ -95,6 +96,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         You can use this to instantiate your model, for instance, since this is
         where you get access to the observation & action spaces.
         """
+        self.total_n_tasks = setting.nb_tasks
         self.optimizer = torch.optim.SGD(
             self.model.parameters(), lr=self.hparams.start_lr, momentum=0.9
         )
@@ -205,6 +207,9 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
 
         self.n_seen_classes += self.n_classes
         self.hparams.epochs *= self.hparams.epochs_decay_per_task
+        if self.task == self.total_n_tasks - 1:
+            # last task fitting done
+            self.compute_final()
 
     def _mahalanobis_update(
         self, train_env: PassiveEnvironment, valid_env: PassiveEnvironment
@@ -377,5 +382,26 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 metrics_dict["noise"] = self.m_list[0]
         return loss, metrics_dict
 
-    def on_task_switch(self, task_id: Optional[int]):
-        pass
+    def compute_final(self):
+        if not(self.hparams.wandb_logging):
+            return
+        self.mahalanobis.sample_mean = self.total_mean
+        self.mahalanobis.precision = self.total_precision 
+        self.mahalanobis.compute_all_noise_mahalanobis(
+            self.test_loader,
+            self.in_transform,
+            self.mahalanobis.args.num_classes,
+            m_list=self.m_list,
+        )
+        results = self.mahalanobis.cross_validate(m_list=self.m_list)
+        metrics_dict = {}
+        for results in results:
+            metrics_dict["Test_Task_{}_{}".format(task_id, "AUROC_ood")] = 100.0 * results["TMP"]["AUROC"]
+            metrics_dict["Test_Task_{}_{}".format(task_id, "TNR_ood")] = 100.0 * results["TMP"]["TNR"]
+            metrics_dict["Test_Task_{}_{}".format(task_id, "DTACC_ood")] = 100.0 * results["TMP"]["DTACC"]
+            metrics_dict["Test_Task_{}_{}".format(task_id, "AUIN_ood")] = 100.0 * results["TMP"]["AUIN"]
+            metrics_dict["Test_Task_{}_{}".format(task_id, "AUOUT_ood")] = 100.0 * results["TMP"]["AUOUT"]
+            # TODO add input noise val
+            metrics_dict["Test_Task_{}_{}".format(task_id, "noise")] = self.m_list[0] 
+        
+        wandb.log(metrics_dict)
