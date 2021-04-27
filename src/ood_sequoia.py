@@ -357,7 +357,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
 
         # Get the predictions:
 
-        logits = self.model(observations.x)
+        logits = self.model(observations.x.to(self.device))
         y_pred = logits.argmax(-1).detach()
 
         if rewards is None:

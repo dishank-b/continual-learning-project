@@ -9,4 +9,6 @@ pip3 install -r requirements.txt
 git clone https://www.github.com/lebrice/Sequoia.git
 cd Sequoia
 pip3 install -e .
-
+pip3 install -r requirements.txt
+# To fix torchmeta batch not found bug
+pip3 install pytorch-lightning --upgrade

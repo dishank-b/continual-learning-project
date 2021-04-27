@@ -192,15 +192,18 @@ if __name__ == "__main__":
         )
         from sequoia.common.config import WandbConfig
 
+        wandb_config = None
+        if args.wandb:
+            WandbConfig(
+                project="cl_final_project",
+                entity="mostafaelaraby",
+                wandb_api_key=args.wandb_api,
+            )
         setting = DomainIncrementalSetting(
             dataset=dataset,
             nb_tasks=nb_tasks,
             batch_size=args.batch_size,
-            wandb=WandbConfig(
-                project="cl_final_project",
-                entity="mostafaelaraby",
-                wandb_api_key=args.wandb_api,
-            ),
+            wandb=wandb_config,
         )
         results = setting.apply(method, config=Config(data_dir="data"))
         # now add plots coming from results
@@ -209,7 +212,7 @@ if __name__ == "__main__":
         summary = results.summary()
         print(summary)
         with open(os.path.join(args.outf, "results.txt"), "w") as f:
-            f.write(summary) 
+            f.write(summary)
 
     else:
         raise NotImplementedError(
