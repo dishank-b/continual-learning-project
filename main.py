@@ -49,6 +49,9 @@ def add_args():
     parser.add_argument(
         "--lwf", action="store_true", help="Baseline LWF",
     )
+    parser.add_argument(
+        "--ewc", action="store_true", help="Baseline EWC",
+    )
     # TODO add flag to run baselines e.g. ewc and lwf etc...
     # TODO add LR as a paramter in the arguments
     return parser
@@ -130,7 +133,7 @@ if __name__ == "__main__":
 
         # TODO add joint training
     elif args.continual:
-        from src import create_model, OODSequoia
+        from src import create_model, OODSequoia, EWCSequoia
         from sequoia.settings.passive.cl import DomainIncrementalSetting
         from sequoia.common import Config
 
@@ -146,6 +149,7 @@ if __name__ == "__main__":
             dataset = args.dataset
             nb_tasks = args.nb_tasks
             epochs = args.epochs
+            # TODO  add a flag to compute mahalanobis distance
             dist_compute = MahalanobisCompute(args, model)
         # TODO add lwf and ewc arguments for the bseline
         if args.lwf:
@@ -158,6 +162,20 @@ if __name__ == "__main__":
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
             )
+            METHOD_CLS = OODSequoia
+        elif args.ewc:
+            hparams = EWCSequoia.HParams(
+                start_lr=3e-4,
+                epochs=epochs,
+                batch_size=args.batch_size,
+                ood_regularizer=0.0,
+                lwf_regularizer=0.0,
+                temperature_lwf=2,
+                wandb_logging=args.wandb,
+                ewc_coefficient=1,
+                ewc_p_norm=2,
+            )
+            METHOD_CLS = EWCSequoia
         else:
             # ours
             hparams = OODSequoia.HParams(
@@ -169,7 +187,8 @@ if __name__ == "__main__":
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
             )
-        method = OODSequoia(
+            METHOD_CLS = OODSequoia
+        method = METHOD_CLS(
             test_loader.dataset, model, dist_compute, in_transform, hparams
         )
         from sequoia.common.config import WandbConfig
@@ -177,11 +196,11 @@ if __name__ == "__main__":
         setting = DomainIncrementalSetting(
             dataset=dataset,
             nb_tasks=nb_tasks,
-            batch_size=args.batch_size, 
+            batch_size=args.batch_size,
             wandb=WandbConfig(
                 project="cl_final_project",
                 entity="mostafaelaraby",
-                wandb_api_key=args.wandb_api
+                wandb_api_key=args.wandb_api,
             ),
         )
         results = setting.apply(method, config=Config(data_dir="data"))

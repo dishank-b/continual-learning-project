@@ -377,3 +377,5 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 metrics_dict["noise"] = self.m_list[0]
         return loss, metrics_dict
 
+    def on_task_switch(self, task_id: Optional[int]):
+        pass
