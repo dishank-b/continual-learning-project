@@ -183,14 +183,17 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
             if epoch - best_epoch > self.hparams.early_stop_patience:
                 print(f"Early stopping at epoch {epoch}. ")
                 break
-        if self.hparams.wandb_logging:
-            wandb.run.summary[f"best epoch task {self.task}"] = best_epoch
+
         if best_val_loss != inf:
+            if self.hparams.wandb_logging:
+                wandb.run.summary[f"best epoch task {self.task}"] = best_epoch
             print(f"Loading model from epoch {best_epoch}!")
             self.model.load_state_dict(best_model)
             if self.scheduler is not None:
                 self.scheduler.load_state_dict(best_scheduler)
             self.optimizer.load_state_dict(best_optimizer)
+        elif self.hparams.wandb_logging:
+            wandb.run.summary[f"best epoch task {self.task}"] = self.hparams.epochs
 
         self.task += 1
         self.prev_model = deepcopy(self.model)
@@ -280,19 +283,22 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         if self.prev_model is not None:
             # LWF like loss function
             # then we need to regularize feature layer based on previous task network
-            regularizer_loss = nn.MSELoss()
-            current_features = self.model.penultimate_forward(observation)[-1]
-            old_logits, old_features = self.prev_model.penultimate_forward(observation)
-            loss += self.hparams.ood_regularizer * regularizer_loss(
-                current_features, old_features.detach()
-            )
+            if self.hparams.ood_regularizer > 0:
+                regularizer_loss = nn.MSELoss()
+                current_features = self.model.penultimate_forward(observation)[-1]
+                old_logits, old_features = self.prev_model.penultimate_forward(
+                    observation
+                )
+                loss += self.hparams.ood_regularizer * regularizer_loss(
+                    current_features, old_features.detach()
+                )
             # knowledge distillation for all seen classes
-
-            loss += self.hparams.lwf_regularizer * self.cross_entropy(
-                logits[:, : self.n_seen_classes],
-                old_logits[:, : self.n_seen_classes],
-                exp=1.0 / self.hparams.temperature_lwf,
-            )
+            if self.hparams.lwf_regularizer > 0:
+                loss += self.hparams.lwf_regularizer * self.cross_entropy(
+                    logits[:, : self.n_seen_classes],
+                    old_logits[:, : self.n_seen_classes],
+                    exp=1.0 / self.hparams.temperature_lwf,
+                )
         return loss
 
     @classmethod
@@ -370,3 +376,4 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 # TODO add input noise val
                 metrics_dict["noise"] = self.m_list[0]
         return loss, metrics_dict
+

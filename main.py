@@ -1,10 +1,12 @@
 import sys
 import os
 import argparse
+from sequoia.common.config import wandb_config
 from torchvision import transforms
 from torch.autograd import Variable
 import torch
 import numpy as np
+import wandb
 
 
 def add_args():
@@ -36,9 +38,16 @@ def add_args():
         "--nb_tasks", type=int, default=7, help="number of class incremental tasks"
     )
     parser.add_argument(
+        "--wandb", action="store_true", help="use wandb for logging the experiment",
+    )
+    parser.add_argument("--wandb_api", help="Wandb API key")
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="debug mode to reduce model size and number of tasks",
+    )
+    parser.add_argument(
+        "--lwf", action="store_true", help="Baseline LWF",
     )
     # TODO add flag to run baselines e.g. ewc and lwf etc...
     # TODO add LR as a paramter in the arguments
@@ -123,15 +132,15 @@ if __name__ == "__main__":
     elif args.continual:
         from src import create_model, OODSequoia
         from sequoia.settings.passive.cl import DomainIncrementalSetting
-
         from sequoia.common import Config
 
         if args.debug:
             model = create_model("debug", args.num_classes)
             dataset = "fashionmnist"
-            nb_tasks = 5
-            epochs = 3
+            nb_tasks = 2
+            epochs = 1
             dist_compute = None
+            os.environ["WANDB_MODE"] = "dryrun"
         else:
             model = create_model(args.net_type, args.num_classes)
             dataset = args.dataset
@@ -139,22 +148,41 @@ if __name__ == "__main__":
             epochs = args.epochs
             dist_compute = MahalanobisCompute(args, model)
         # TODO add lwf and ewc arguments for the bseline
-        hparams = OODSequoia.HParams(
-            start_lr=3e-4,
-            epochs=epochs,
-            batch_size=args.batch_size,
-            ood_regularizer=0.75,
-            lwf_regularizer=0,
-            temperature_lwf=2,
-            wandb_logging=False,
-        )
+        if args.lwf:
+            hparams = OODSequoia.HParams(
+                start_lr=3e-4,
+                epochs=epochs,
+                batch_size=args.batch_size,
+                ood_regularizer=0.0,
+                lwf_regularizer=1,
+                temperature_lwf=2,
+                wandb_logging=args.wandb,
+            )
+        else:
+            # ours
+            hparams = OODSequoia.HParams(
+                start_lr=3e-4,
+                epochs=epochs,
+                batch_size=args.batch_size,
+                ood_regularizer=0.75,
+                lwf_regularizer=0,
+                temperature_lwf=2,
+                wandb_logging=args.wandb,
+            )
         method = OODSequoia(
             test_loader.dataset, model, dist_compute, in_transform, hparams
         )
+        from sequoia.common.config import WandbConfig
+
         setting = DomainIncrementalSetting(
             dataset=dataset,
             nb_tasks=nb_tasks,
-            batch_size=args.batch_size,
+            batch_size=args.batch_size, 
+            wandb=WandbConfig(
+                project="cl_final_project",
+                entity="mostafaelaraby",
+                wandb_api_key=args.wandb_api
+            ),
         )
         results = setting.apply(method, config=Config(data_dir="data"))
         # now add plots coming from results
@@ -164,7 +192,6 @@ if __name__ == "__main__":
         print(summary)
         with open(os.path.join(args.outf, "results.txt"), "w") as f:
             f.write(summary)
-        # TODO add WANDB support
 
     else:
         raise NotImplementedError(
