@@ -194,7 +194,7 @@ if __name__ == "__main__":
 
         wandb_config = None
         if args.wandb:
-            WandbConfig(
+            wandb_config = WandbConfig(
                 project="cl_final_project",
                 entity="mostafaelaraby",
                 wandb_api_key=args.wandb_api,
