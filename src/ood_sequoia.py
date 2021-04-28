@@ -148,7 +148,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                     self.optimizer.step()
                     postfix.update(metrics_dict)
                     train_pbar.set_postfix(postfix)
-                    self.n_examples_seen += len(batch[0].x)
+                    self.n_examples_seen += len(batch[0].x) 
 
                     if self.hparams.wandb_logging:
                         wandb.log(metrics_dict)
@@ -196,9 +196,6 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
             self.optimizer.load_state_dict(best_optimizer)
         elif self.hparams.wandb_logging:
             wandb.run.summary[f"best epoch task {self.task}"] = self.hparams.epochs
-
-        self.task += 1
-        self.prev_model = deepcopy(self.model)
         self.model.train()
         # Training loop:
         torch.set_grad_enabled(True)
@@ -210,6 +207,8 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         if self.task == self.total_n_tasks - 1:
             # last task fitting done
             self.compute_final()
+        self.task += 1
+        self.prev_model = deepcopy(self.model)
 
     def _mahalanobis_update(
         self, train_env: PassiveEnvironment, valid_env: PassiveEnvironment
@@ -245,7 +244,8 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 self.total_precision[i] = (
                     n_classes / (n_classes + 1)
                 ) * self.total_precision[i] + (1 / (n_classes + 1)) * precision[i]
-            self.total_mean = self.total_mean + sample_mean
+            for i in range(len(sample_mean)):
+                self.total_mean[i] = torch.cat((self.total_mean[i], sample_mean[i]), 0)
         self.mahalanobis.sample_mean = sample_mean
         self.mahalanobis.precision = precision
         self.mahalanobis.compute_all_noise_mahalanobis(
@@ -412,6 +412,6 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 100.0 * results["TMP"]["AUOUT"]
             )
             # TODO add input noise val
-            metrics_dict["Test_Task_{}_{}".format(task_id, "noise")] = self.m_list[0]
+            metrics_dict["Test_Task_{}".format( "noise")] = self.m_list[0]
 
         wandb.log(metrics_dict)
