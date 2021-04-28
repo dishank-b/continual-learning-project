@@ -258,7 +258,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
     ) -> Actions:
         """ Get a batch of predictions (aka actions) for these observations. """
         with torch.no_grad():
-            logits = self.model(observations.x)
+            logits = self.model(observations.x.to(self.device))
         # Get the predicted classes
         y_pred = logits.argmax(dim=-1)
         return self.target_setting.Actions(y_pred)

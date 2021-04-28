@@ -181,7 +181,7 @@ if __name__ == "__main__":
                 start_lr=3e-4,
                 epochs=epochs,
                 batch_size=args.batch_size,
-                ood_regularizer=0.75,
+                ood_regularizer=1,
                 lwf_regularizer=0,
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
