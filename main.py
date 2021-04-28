@@ -145,7 +145,7 @@ if __name__ == "__main__":
             dist_compute = None
             os.environ["WANDB_MODE"] = "dryrun"
         else:
-            model = create_model(args.net_type, args.num_classes)
+            model = create_model(args.net_type, args.num_classes).to(device)
             dataset = args.dataset
             nb_tasks = args.nb_tasks
             epochs = args.epochs

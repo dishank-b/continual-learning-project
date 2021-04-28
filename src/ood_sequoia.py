@@ -221,7 +221,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 normalize_classes=self.n_seen_classes > 0,
                 n_prev_classes=self.n_seen_classes,
             ),
-            batch_size=self.hparams.batch_size,
+            batch_size=32,
             shuffle=True,
         )
         val_loader_partial = DataLoader(
@@ -230,7 +230,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 normalize_classes=self.n_seen_classes > 0,
                 n_prev_classes=self.n_seen_classes,
             ),
-            batch_size=self.hparams.batch_size,
+            batch_size=32,
             shuffle=True,
         )
         n_classes = train_env.dataset.nb_classes
