@@ -166,6 +166,7 @@ class MahalanobisCompute:
             print(" {val:6.2f}\n".format(val=100.0 * results["TMP"]["AUOUT"]), end="")
             print("Input noise: " + list_best_results_index_out[count_out])
             print("")
+            count_out +=1
         return list_best_results_out
 
     def fit_regression(self, x_train, y_train):
