@@ -188,7 +188,7 @@ if __name__ == "__main__":
             )
             METHOD_CLS = OODSequoia
         method = METHOD_CLS(
-            test_loader.dataset, model, dist_compute, in_transform, hparams
+            test_loader, model, dist_compute, in_transform, hparams
         )
         from sequoia.common.config import WandbConfig
 

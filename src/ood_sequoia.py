@@ -61,14 +61,14 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         noise_ood: float = 0.001
 
     def __init__(
-        self, test_dataset, model, mahalanobis, in_transform, hparams=None,
+        self, test_loader, model, mahalanobis, in_transform, hparams=None,
     ) -> None:
         self.hparams = hparams or OODSequoia.HParams()
         self.model = model
         self.mahalanobis = mahalanobis
         self.optimizer: torch.optim.Optimizer
         self.in_transform = in_transform
-        self.test_dataset = test_dataset
+        self.test_loader = test_loader
         self.scheduler = None
         self.n_classes = None
         self.n_seen_classes = None
