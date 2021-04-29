@@ -80,7 +80,10 @@ if __name__ == "__main__":
 
     network_f_name = args.net_type + "_" + args.dataset + ".pth"
     pre_trained_net = "./pre_trained/" + network_f_name
-    args.outf = args.outf + args.net_type + "_" + args.dataset + "/"
+    args.outf = args.outf + args.net_type + "_" + args.dataset
+    if args.wandb_run_name is not None:
+        args.outf += "_" + args.wandb_run_name
+    args.outf += "/"
     if os.path.isdir(args.outf) == False:
         os.makedirs(args.outf)
 
@@ -207,7 +210,7 @@ if __name__ == "__main__":
                 project="cl_final_project",
                 entity="mostafaelaraby",
                 wandb_api_key=args.wandb_api,
-                run_name=args.wandb_run_name
+                run_name=args.wandb_run_name,
             )
         setting = DomainIncrementalSetting(
             dataset=dataset,
