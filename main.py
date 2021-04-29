@@ -171,6 +171,7 @@ if __name__ == "__main__":
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
                 early_stop_patience=args.patience,
+                compute_risk=args.risk,
             )
             METHOD_CLS = OODSequoia
         elif args.ewc:
@@ -185,6 +186,7 @@ if __name__ == "__main__":
                 ewc_coefficient=1,
                 ewc_p_norm=2,
                 early_stop_patience=args.patience,
+                compute_risk=args.risk,
             )
             METHOD_CLS = EWCSequoia
         else:
