@@ -420,13 +420,13 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         results = self.mahalanobis.cross_validate(m_list=self.m_list)
         metrics_dict = {}
         for results in results:
-            metrics_dict["Test_Task_{}_{}".format("AUROC_ood")] = (
+            metrics_dict["Test_Task_{}".format("AUROC_ood")] = (
                 100.0 * results["TMP"]["AUROC"]
             )
-            metrics_dict["Test_Task_{}_{}".format("TNR_ood")] = (
+            metrics_dict["Test_Task_{}".format("TNR_ood")] = (
                 100.0 * results["TMP"]["TNR"]
             )
-            metrics_dict["Test_Task_{}_{}".format("DTACC_ood")] = (
+            metrics_dict["Test_Task_{}".format("DTACC_ood")] = (
                 100.0 * results["TMP"]["DTACC"]
             )
             metrics_dict["Test_Task_{}".format("AUIN_ood")] = (
