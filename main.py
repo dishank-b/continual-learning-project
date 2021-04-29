@@ -21,6 +21,7 @@ def add_args():
     parser.add_argument(
         "--epochs", type=int, default=200, metavar="N", help="training epochs"
     )
+    parser.add_argument("--patience", type=int, default=4, help="training patience")
     parser.add_argument("--dataset", required=True, help="cifar10 | cifar100 | svhn")
     parser.add_argument("--dataroot", default="./data", help="path to dataset")
     parser.add_argument("--outf", default="./output/", help="folder to output results")
@@ -47,7 +48,9 @@ def add_args():
         help="debug mode to reduce model size and number of tasks",
     )
     parser.add_argument(
-        "--risk", action="store_true", help="Compute uncertainty of each new task to switch lwf on/off",
+        "--risk",
+        action="store_true",
+        help="Compute uncertainty of each new task to switch lwf on/off",
     )
     parser.add_argument(
         "--lwf", action="store_true", help="Baseline LWF",
@@ -163,6 +166,7 @@ if __name__ == "__main__":
                 lwf_regularizer=1,
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
+                early_stop_patience=args.patience,
             )
             METHOD_CLS = OODSequoia
         elif args.ewc:
@@ -176,6 +180,7 @@ if __name__ == "__main__":
                 wandb_logging=args.wandb,
                 ewc_coefficient=1,
                 ewc_p_norm=2,
+                early_stop_patience=args.patience,
             )
             METHOD_CLS = EWCSequoia
         else:
@@ -188,12 +193,11 @@ if __name__ == "__main__":
                 lwf_regularizer=0,
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
-                compute_risk=args.risk
+                compute_risk=args.risk,
+                early_stop_patience=args.patience,
             )
             METHOD_CLS = OODSequoia
-        method = METHOD_CLS(
-            test_loader, model, dist_compute, in_transform, hparams
-        )
+        method = METHOD_CLS(test_loader, model, dist_compute, in_transform, hparams)
         from sequoia.common.config import WandbConfig
 
         wandb_config = None
