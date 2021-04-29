@@ -31,5 +31,5 @@ class EWCSequoia(OODSequoia, target_setting=ClassIncrementalSetting):
             old_weights: Dict[str, Tensor] = dict(self.prev_model.named_parameters())
             new_weights: Dict[str, Tensor] = dict(self.model.named_parameters())
             for _, (new_w, old_w) in dict_intersection(new_weights, old_weights):
-                loss += torch.dist(new_w, old_w.type_as(new_w), p=self.ewc_p_norm) 
+                loss += self.hparams.ewc_coefficient * torch.dist(new_w, old_w.type_as(new_w), p=self.hparams.ewc_p_norm) 
         return loss

@@ -305,6 +305,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         observation = observation.to(self.device)
         logits = self.model(observation)
         loss = loss_fn(logits, labels)
+        old_logits = None
         if self.prev_model is not None:
             # LWF like loss function
             # then we need to regularize feature layer based on previous task network
@@ -323,6 +324,10 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 if self.task_risk>0.5:
                     lwf_regularizer = 0.5 * self.hparams.ood_regularizer
             if lwf_regularizer > 0:
+                if old_logits is None: 
+                    old_logits, old_features = self.prev_model.penultimate_forward(
+                        observation
+                    )
                 loss += self.hparams.lwf_regularizer * self.cross_entropy(
                     logits[:, : self.n_seen_classes],
                     old_logits[:, : self.n_seen_classes],

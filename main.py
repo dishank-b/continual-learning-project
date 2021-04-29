@@ -58,6 +58,7 @@ def add_args():
     parser.add_argument(
         "--ewc", action="store_true", help="Baseline EWC",
     )
+    parser.add_argument("--wandb_run_name", help="Wandb Run Name", default=None)
     # TODO add flag to run baselines e.g. ewc and lwf etc...
     # TODO add LR as a paramter in the arguments
     return parser
@@ -206,6 +207,7 @@ if __name__ == "__main__":
                 project="cl_final_project",
                 entity="mostafaelaraby",
                 wandb_api_key=args.wandb_api,
+                run_name=args.wandb_run_name
             )
         setting = DomainIncrementalSetting(
             dataset=dataset,
