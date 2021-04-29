@@ -59,6 +59,8 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         # decay of max_epochs after each task
         epochs_decay_per_task: float = 0.95
         noise_ood: float = 0.001
+        # compute risk associated with each task to enable/disable lwf like loss with ood_regularizer/2
+        compute_risk: bool = True
 
     def __init__(
         self, test_loader, model, mahalanobis, in_transform, hparams=None,
@@ -110,6 +112,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         self.total_mean = None
         self.total_precision = None
         self.ood_results = None
+        self.task_risk = None
 
     def fit(self, train_env: PassiveEnvironment, valid_env: PassiveEnvironment):
         """ Example train loop.
@@ -129,7 +132,8 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         best_epoch = 0
         self.memorize = False
         self.n_classes = train_env.dataset.nb_classes
-        # TODO predict current task risk using Mahalanobis distance
+        if self.hparams.compute_risk and self.task>0:
+            self.task_risk = self.compute_risk(train_env)
         for epoch in range(int(floor(self.hparams.epochs))):
             self.model.train()
             print(f"Starting epoch {epoch}")
@@ -148,8 +152,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                     self.optimizer.step()
                     postfix.update(metrics_dict)
                     train_pbar.set_postfix(postfix)
-                    self.n_examples_seen += len(batch[0].x) 
-
+                    self.n_examples_seen += len(batch[0].x)
                     if self.hparams.wandb_logging:
                         wandb.log(metrics_dict)
             if self.scheduler is not None:
@@ -251,7 +254,24 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         self.mahalanobis.compute_all_noise_mahalanobis(
             val_loader_partial, self.in_transform, n_classes, m_list=self.m_list
         )
-        self.ood_results = self.mahalanobis.cross_validate(m_list=self.m_list)
+        self.ood_results = self.mahalanobis.cross_validate(
+            m_list=self.m_list, save_classifier=self.hparams.compute_risk
+        )
+    
+    def compute_risk(self, train_env:PassiveEnvironment):
+        if self.mahalanobis is None:
+            # 1 means high risk ood and 0 no risk
+            return 0
+        train_loader_partial = DataLoader(
+            CustomDataset(
+                train_env.dataset,
+                normalize_classes=False,
+            ),
+            batch_size=32,
+            shuffle=True,
+        ) 
+        risk = self.mahalanobis.compute_task_risk(train_loader_partial, self.m_list[0], self.n_seen_classes)
+        return risk
 
     def get_actions(
         self, observations: Observations, action_space: gym.Space
@@ -298,7 +318,11 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                     current_features, old_features.detach()
                 )
             # knowledge distillation for all seen classes
-            if self.hparams.lwf_regularizer > 0:
+            lwf_regularizer = self.hparams.lwf_regularizer
+            if self.hparams.compute_risk and self.task_risk is not None:
+                if self.task_risk>0.5:
+                    lwf_regularizer = 0.5 * self.hparams.ood_regularizer
+            if lwf_regularizer > 0:
                 loss += self.hparams.lwf_regularizer * self.cross_entropy(
                     logits[:, : self.n_seen_classes],
                     old_logits[:, : self.n_seen_classes],
@@ -412,6 +436,6 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 100.0 * results["TMP"]["AUOUT"]
             )
             # TODO add input noise val
-            metrics_dict["Test_Task_{}".format( "noise")] = self.m_list[0]
+            metrics_dict["Test_Task_{}".format("noise")] = self.m_list[0]
 
         wandb.log(metrics_dict)

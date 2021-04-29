@@ -47,6 +47,9 @@ def add_args():
         help="debug mode to reduce model size and number of tasks",
     )
     parser.add_argument(
+        "--risk", action="store_true", help="Compute uncertainty of each new task to switch lwf on/off",
+    )
+    parser.add_argument(
         "--lwf", action="store_true", help="Baseline LWF",
     )
     parser.add_argument(
@@ -185,6 +188,7 @@ if __name__ == "__main__":
                 lwf_regularizer=0,
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
+                compute_risk=args.risk
             )
             METHOD_CLS = OODSequoia
         method = METHOD_CLS(
