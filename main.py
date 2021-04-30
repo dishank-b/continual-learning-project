@@ -11,6 +11,7 @@ import wandb
 
 def add_args():
     parser = argparse.ArgumentParser(description="PyTorch code: Mahalanobis detector")
+    # training arguments
     parser.add_argument(
         "--batch_size",
         type=int,
@@ -27,6 +28,19 @@ def add_args():
     parser.add_argument("--outf", default="./output/", help="folder to output results")
     parser.add_argument("--num_classes", type=int, default=10, help="the # of classes")
     parser.add_argument("--net_type", required=True, help="resnet | densenet")
+    # debug mode flag to allow debugging
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="debug mode to reduce model size and number of tasks",
+    )
+    # Experiment type flags
+    parser.add_argument(
+        "--lwf", action="store_true", help="Baseline LWF",
+    )
+    parser.add_argument(
+        "--ewc", action="store_true", help="Baseline EWC",
+    )
     parser.add_argument(
         "--reproduce", action="store_true", help="Reproducing Deep Mahalanobis compute"
     )
@@ -36,31 +50,31 @@ def add_args():
         help="Class incremental scenario with deep Mahalanobis  ",
     )
     parser.add_argument(
-        "--nb_tasks", type=int, default=7, help="number of class incremental tasks"
-    )
-    parser.add_argument(
-        "--wandb", action="store_true", help="use wandb for logging the experiment",
-    )
-    parser.add_argument("--wandb_api", help="Wandb API key")
-    parser.add_argument(
-        "--debug",
+        "--mahalanobis",
         action="store_true",
-        help="debug mode to reduce model size and number of tasks",
+        help="flag to add mahalanobis computation",
+    )
+    # Incremental learning params
+
+    parser.add_argument(
+        "--ood_regularizer", type=float, help="Feature regularizer lambda", default=1.0
+    )
+    parser.add_argument(
+        "--nb_tasks", type=int, default=7, help="number of class incremental tasks"
     )
     parser.add_argument(
         "--risk",
         action="store_true",
         help="Compute uncertainty of each new task to switch lwf on/off",
     )
+    # Wandb Arguments
     parser.add_argument(
-        "--lwf", action="store_true", help="Baseline LWF",
+        "--wandb", action="store_true", help="use wandb for logging the experiment",
     )
-    parser.add_argument(
-        "--ewc", action="store_true", help="Baseline EWC",
-    )
+    parser.add_argument("--wandb_api", help="Wandb API key")
+    parser.add_argument("--wandb_entity", help="Entity posting wandb logs if any")
+    parser.add_argument("--wandb_project", help="Project name of wandb logs if any")
     parser.add_argument("--wandb_run_name", help="Wandb Run Name", default=None)
-    # TODO add flag to run baselines e.g. ewc and lwf etc...
-    # TODO add LR as a paramter in the arguments
     return parser
 
 
@@ -74,7 +88,6 @@ if __name__ == "__main__":
     else:
         # throw error to clone the repo of deep mahalanobis code
         raise Exception("Deep Mahalanobis code not found!")
-
     import data_loader
     from src import MahalanobisCompute, create_trainer_model
 
@@ -141,26 +154,25 @@ if __name__ == "__main__":
         # now training a logistic regression to detect OOD samples based on its mahalanobis score with reporting its performance
         dist_compute.cross_validate()
 
-        # TODO add joint training
     elif args.continual:
         from src import create_model, OODSequoia, EWCSequoia
         from sequoia.settings.passive.cl import DomainIncrementalSetting
         from sequoia.common import Config
 
+        dist_compute = None
         if args.debug:
             model = create_model("debug", args.num_classes)
             dataset = "fashionmnist"
             nb_tasks = 2
             epochs = 1
-            dist_compute = None
             os.environ["WANDB_MODE"] = "dryrun"
         else:
             model = create_model(args.net_type, args.num_classes).to(device)
             dataset = args.dataset
             nb_tasks = args.nb_tasks
             epochs = args.epochs
-            # TODO  add a flag to compute mahalanobis distance
-            dist_compute = MahalanobisCompute(args, model)
+            if args.mahalanobis:
+                dist_compute = MahalanobisCompute(args, model)
         if args.lwf:
             hparams = OODSequoia.HParams(
                 start_lr=3e-4,
@@ -195,7 +207,7 @@ if __name__ == "__main__":
                 start_lr=3e-4,
                 epochs=epochs,
                 batch_size=args.batch_size,
-                ood_regularizer=1,
+                ood_regularizer=args.ood_regularizer,
                 lwf_regularizer=0,
                 temperature_lwf=2,
                 wandb_logging=args.wandb,
@@ -209,8 +221,8 @@ if __name__ == "__main__":
         wandb_config = None
         if args.wandb:
             wandb_config = WandbConfig(
-                project="cl_final_project",
-                entity="mostafaelaraby",
+                project=args.wandb_project,
+                entity=args.wandb_entity,
                 wandb_api_key=args.wandb_api,
                 run_name=args.wandb_run_name,
             )

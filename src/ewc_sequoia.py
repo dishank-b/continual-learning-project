@@ -11,17 +11,37 @@ from sequoia.utils import dict_intersection
 
 
 class EWCSequoia(OODSequoia, target_setting=ClassIncrementalSetting):
+    """EWC implementation based on Sequoia library examples
+    """    
     @dataclass
     class HParams(OODSequoia.HParams):
         ewc_coefficient: float = 1.0
         ewc_p_norm: int = 2
 
     def __init__(
-        self, test_dataset, model, mahalanobis, in_transform, hparams=None,
+        self, test_loader, model, mahalanobis, in_transform, hparams=None,
     ) -> None:
-        super().__init__(test_dataset, model, mahalanobis, in_transform, hparams)
+        """Initialize EWC Sequoia
+
+        Args:
+            test_dataset (torch.dataloader): dataset used for testing purposes
+            model (nn.Module): pytorch Model
+            mahalanobis (MahalanobisCompute): object used to compute mahalanobis distance
+            in_transform (list): list of transformation applied to input
+            hparams (HParams, optional): hyperparameters specific to the method. Defaults to None.
+        """    
+        super().__init__(test_loader, model, mahalanobis, in_transform, hparams)
 
     def loss(self, observation, labels):
+        """EWC Loss function
+
+        Args:
+            observation (tensor): Observation batch
+            labels (list): list of labels for the input transformations
+
+        Returns:
+            tensor: loss value
+        """        
         loss_fn = nn.CrossEntropyLoss()
         observation = observation.to(self.device)
         logits = self.model(observation)

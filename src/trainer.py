@@ -6,6 +6,8 @@ from sklearn.metrics import accuracy_score
 
 
 class TestModel(nn.Module):
+    """A model used for testing purposes when debug flag enabled 
+    """    
     def __init__(self, n_classes):
         super().__init__()
         encoder_layers = []
@@ -25,7 +27,6 @@ class TestModel(nn.Module):
  
 
     def forward(self, x):
-        # NOTE: here we don't make use of the task labels.
         logits = x
         for indx, layer in enumerate(self.model):
             logits = layer(logits)
@@ -54,6 +55,18 @@ class TestModel(nn.Module):
 
 
 def create_model(net_type, n_classes):
+    """Creates a network
+
+    Args:
+        net_type (str): network type
+        n_classes (int): number of classes
+
+    Raises:
+        Exception: Network type not supported
+
+    Returns:
+        Model: model object
+    """    
     if net_type == "densenet":
         model = models.DenseNet3(100, n_classes)
     elif net_type == "resnet":
@@ -77,7 +90,22 @@ def create_trainer_model(
     batch_size=128,
     start_lr=0.1,
 ):
-    # TODO add flag for continual learning training setup
+    """Create pytorch lightning trainer and model
+
+    Args:
+        net_type (str): network name
+        train_loader (torch.dataloader): training data loader
+        test_loader (torch.dataloader): testing data loader
+        n_classes (int): number of classes
+        epochs (int): number of epochs
+        filename (str): name of model checkpoint
+        decay (float, optional): learning rate decay. Defaults to 0.1.
+        batch_size (int, optional): batch size. Defaults to 128.
+        start_lr (float, optional): learning rate at the start of the training. Defaults to 0.1.
+
+    Returns:
+        [type]: [description]
+    """    
     torch.cuda.manual_seed(0)
     from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -90,7 +118,6 @@ def create_trainer_model(
         gpus=1 if torch.cuda.is_available() else None,
         checkpoint_callback=checkpoint_callback,
     )
-    # TODO add model name Resnet
     model = CustomModel(
         net_type,
         train_loader,

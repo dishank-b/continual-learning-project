@@ -10,6 +10,8 @@ from sklearn.model_selection import train_test_split
 
 
 class MahalanobisCompute:
+    """Wrapper on top of deep_mahalanobis distance to continually update covariance and mean
+    """    
     def __init__(self, args, base_model):
         self.args = args
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -23,6 +25,8 @@ class MahalanobisCompute:
         self._init_information()
 
     def _init_information(self):
+        """Initialization of information
+        """        
         if self.args.dataset == "svhn":
             self.out_dist_list = ["cifar10", "imagenet_resize", "lsun_resize"]
         else:
@@ -38,13 +42,23 @@ class MahalanobisCompute:
             self.feature_list[count] = out.size(1)
             count += 1
         self.ood_classifiers = {}
-        # TODO add deepfool list of classifiers ;)
 
     def update_network(self, model):
+        """updates network used to compute mean and covariance
+
+        Args:
+            model (nn.Module): new task's model
+        """        
         self.model = model.to(self.device)
         self._init_information()
 
     def compute_data_stats(self, train_loader, num_classes):
+        """Computes mean and covariance
+
+        Args:
+            train_loader (torch.dataloader): training data loader
+            num_classes (int): number of classes
+        """        
         print("get sample mean and covariance")
         self.sample_mean, self.precision = self.sample_estimator(
             train_loader, num_classes

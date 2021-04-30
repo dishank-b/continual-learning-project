@@ -26,7 +26,17 @@ from copy import deepcopy
 
 
 class CustomDataset:
+    """Custom Dataset used to remove task t from the batch to use deep_mahalanobis_detector library
+    """
+
     def __init__(self, dataset, normalize_classes=False, n_prev_classes=0) -> None:
+        """Initialize Custom dataset
+
+        Args:
+            dataset (torch.dataset): pytorch dataset
+            normalize_classes (bool, optional): a flag to normalize classes to start from 0. Defaults to False.
+            n_prev_classes (int, optional): number of prev classes to normalize output. Defaults to 0.
+        """
         self.dataset = dataset
         self.normalize_classes = normalize_classes
         self.n_prev_classes = n_prev_classes
@@ -45,6 +55,9 @@ class CustomDataset:
 
 
 class OODSequoia(Method, target_setting=ClassIncrementalSetting):
+    """EWC implementation based on Sequoia library examples
+    """
+
     @dataclass
     class HParams(HyperParameters):
         start_lr: float = 3e-4
@@ -65,6 +78,15 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
     def __init__(
         self, test_loader, model, mahalanobis, in_transform, hparams=None,
     ) -> None:
+        """Initialize OOD Sequoia (Our approach)
+
+        Args:
+            test_dataset (torch.dataloader): dataset used for testing purposes
+            model (nn.Module): pytorch Model
+            mahalanobis (MahalanobisCompute): object used to compute mahalanobis distance
+            in_transform (list): list of transformation applied to input
+            hparams (HParams, optional): hyperparameters specific to the method. Defaults to None.
+        """
         self.hparams = hparams or OODSequoia.HParams()
         self.model = model
         self.mahalanobis = mahalanobis
@@ -88,15 +110,17 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
             )
             else 1
         )
-        # TODO use more noise list in the future
         self.m_list = [self.hparams.noise_ood]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def configure(self, setting: ClassIncrementalSetting):
-        """ Called before the method is applied on a setting (before training).
+        """Called before the method is applied on a setting (before training).
 
         You can use this to instantiate your model, for instance, since this is
         where you get access to the observation & action spaces.
+
+        Args:
+            setting (ClassIncrementalSetting): Current Continual training setting
         """
         self.total_n_tasks = setting.nb_tasks
         self.optimizer = torch.optim.SGD(
@@ -115,13 +139,16 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         self.task_risk = None
 
     def fit(self, train_env: PassiveEnvironment, valid_env: PassiveEnvironment):
-        """ Example train loop.
+        """Example train loop.
         You can do whatever you want with train_env and valid_env here.
 
         NOTE: In the Settings where task boundaries are known (in this case all
         the supervised CL settings), this will be called once per task.
+
+        Args:
+            train_env (PassiveEnvironment): current task train environment
+            valid_env (PassiveEnvironment): current task validation environment
         """
-        # configure() will have been called by the setting before we get here.
         best_model = self.model.state_dict()
         if self.scheduler is not None:
             best_scheduler = self.scheduler.state_dict()
@@ -132,7 +159,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         best_epoch = 0
         self.memorize = False
         self.n_classes = train_env.dataset.nb_classes
-        if self.hparams.compute_risk and self.task>0:
+        if self.hparams.compute_risk and self.task > 0:
             self.task_risk = self.compute_risk(train_env)
         for epoch in range(int(floor(self.hparams.epochs))):
             self.model.train()
@@ -216,6 +243,12 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
     def _mahalanobis_update(
         self, train_env: PassiveEnvironment, valid_env: PassiveEnvironment
     ):
+        """Updating mahalanobis distance values after each task
+
+        Args:
+            train_env (PassiveEnvironment): Training environment
+            valid_env (PassiveEnvironment): Validation environment
+        """
         self.mahalanobis.update_network(self.model)
         train_loader_partial = DataLoader(
             CustomDataset(
@@ -257,26 +290,42 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         self.ood_results = self.mahalanobis.cross_validate(
             m_list=self.m_list, save_classifier=self.hparams.compute_risk
         )
-    
-    def compute_risk(self, train_env:PassiveEnvironment):
+
+    def compute_risk(self, train_env: PassiveEnvironment):
+        """Computes risk associated with a task
+
+        Args:
+            train_env (PassiveEnvironment): input train environment
+
+        Returns:
+            float: risk value 1 means high risk ood and 0 no risk
+        """
         if self.mahalanobis is None:
             # 1 means high risk ood and 0 no risk
             return 0
+        # FIXME a bug in risk computation
         train_loader_partial = DataLoader(
-            CustomDataset(
-                train_env.dataset,
-                normalize_classes=False,
-            ),
+            CustomDataset(train_env.dataset, normalize_classes=False,),
             batch_size=32,
             shuffle=True,
-        ) 
-        risk = self.mahalanobis.compute_task_risk(train_loader_partial, self.m_list[0], self.n_seen_classes)
+        )
+        risk = self.mahalanobis.compute_task_risk(
+            train_loader_partial, self.m_list[0], self.n_seen_classes
+        )
         return risk
 
     def get_actions(
         self, observations: Observations, action_space: gym.Space
     ) -> Actions:
-        """ Get a batch of predictions (aka actions) for these observations. """
+        """Get a batch of predictions (aka actions) for these observations. 
+
+        Args:
+            observations (Observations): input observation batch
+            action_space (gym.Space): space of actions for RL mostly
+
+        Returns:
+            Actions: actions predicted
+        """
         with torch.no_grad():
             logits = self.model(observations.x.to(self.device))
         # Get the predicted classes
@@ -284,7 +333,18 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         return self.target_setting.Actions(y_pred)
 
     def cross_entropy(self, outputs, targets, exp=1.0, size_average=True, eps=1e-5):
-        """Calculates cross-entropy with temperature scaling"""
+        """Calculates cross-entropy with temperature scaling for lwf
+
+        Args:
+            outputs (tensor): output logits
+            targets (list): list of labels
+            exp (float, optional): temperature scaling value. Defaults to 1.0.
+            size_average (bool, optional): average of cross entropy output. Defaults to True.
+            eps (float, optional): epsilon to avoid getting abs zero inside a log. Defaults to 1e-5.
+
+        Returns:
+            tensor: value of the loss
+        """
         out = torch.nn.functional.softmax(outputs, dim=1)
         tar = torch.nn.functional.softmax(targets, dim=1)
         if exp != 1:
@@ -300,6 +360,15 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
         return ce
 
     def loss(self, observation, labels):
+        """Ours Loss + lwf function
+
+        Args:
+            observation (tensor): Observation batch
+            labels (list): list of labels for the input transformations
+
+        Returns:
+            tensor: loss value
+        """
         loss_fn = nn.CrossEntropyLoss()
 
         observation = observation.to(self.device)
@@ -321,10 +390,10 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
             # knowledge distillation for all seen classes
             lwf_regularizer = self.hparams.lwf_regularizer
             if self.hparams.compute_risk and self.task_risk is not None:
-                if self.task_risk>0.5:
+                if self.task_risk > 0.5:
                     lwf_regularizer = 0.5 * self.hparams.ood_regularizer
             if lwf_regularizer > 0:
-                if old_logits is None: 
+                if old_logits is None:
                     old_logits, old_features = self.prev_model.penultimate_forward(
                         observation
                     )
@@ -407,11 +476,12 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
                 metrics_dict["DTACC_ood"] = 100.0 * results["TMP"]["DTACC"]
                 metrics_dict["AUIN_ood"] = 100.0 * results["TMP"]["AUIN"]
                 metrics_dict["AUOUT_ood"] = 100.0 * results["TMP"]["AUOUT"]
-                # TODO add input noise val
                 metrics_dict["noise"] = self.m_list[0]
         return loss, metrics_dict
 
     def compute_final(self):
+        """Computes final test set results using OOD detector and running total covariance computed from seen tasks
+        """
         if not (self.hparams.wandb_logging):
             return
         self.mahalanobis.sample_mean = self.total_mean
@@ -440,7 +510,6 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
             metrics_dict["Test_Task_{}".format("AUOUT_ood")] = (
                 100.0 * results["TMP"]["AUOUT"]
             )
-            # TODO add input noise val
             metrics_dict["Test_Task_{}".format("noise")] = self.m_list[0]
 
         wandb.log(metrics_dict)
