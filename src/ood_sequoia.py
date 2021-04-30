@@ -482,7 +482,7 @@ class OODSequoia(Method, target_setting=ClassIncrementalSetting):
     def compute_final(self):
         """Computes final test set results using OOD detector and running total covariance computed from seen tasks
         """
-        if not (self.hparams.wandb_logging):
+        if not (self.hparams.wandb_logging) or self.mahalanobis is None:
             return
         self.mahalanobis.sample_mean = self.total_mean
         self.mahalanobis.precision = self.total_precision
